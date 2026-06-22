@@ -343,6 +343,24 @@ async def is_admin(chat_id: int, user_id: int) -> bool:
         return False
 
 
+async def is_command_admin(message: Message) -> bool:
+    """
+    Oddiy admin, ADMIN_IDS yoki anonim admin/guruh-kanal nomidan yozilgan buyruqlarni admin deb qabul qiladi.
+    Anonim admin bo'lsa Telegram haqiqiy user_id bermaydi, sender_chat beradi.
+    """
+    try:
+        if message.from_user and await is_admin(message.chat.id, message.from_user.id):
+            return True
+    except Exception:
+        pass
+
+    # Anonymous admin / send as group/channel holati.
+    if getattr(message, "sender_chat", None):
+        return True
+
+    return False
+
+
 async def is_subscribed(user_id: int) -> bool:
     if not CHANNEL_USERNAME:
         return True
@@ -596,7 +614,7 @@ async def my_count(message: Message):
 
     # /men hamma uchun, lekin guruh spam bo'lmasligi uchun kuniga 2 marta.
     # Adminlarga limit yo'q.
-    if not await is_admin(message.chat.id, message.from_user.id):
+    if not await is_command_admin(message):
         allowed, left = can_use_command_today(
             message.chat.id,
             message.from_user.id,
@@ -625,7 +643,7 @@ async def top_cmd(message: Message):
         return
 
     # /top faqat admin uchun. Hamma bosaversa guruhda ortiqcha xabar ko'payadi.
-    if not await is_admin(message.chat.id, message.from_user.id):
+    if not await is_command_admin(message):
         try:
             await message.delete()
         except Exception:
@@ -653,7 +671,7 @@ async def top_cmd(message: Message):
 async def reset_top_cmd(message: Message):
     if message.chat.type == ChatType.PRIVATE:
         return
-    if not await is_admin(message.chat.id, message.from_user.id):
+    if not await is_command_admin(message):
         await message.reply("⛔ Faqat admin uchun.")
         return
     reset_top(message.chat.id)
@@ -664,7 +682,7 @@ async def reset_top_cmd(message: Message):
 async def settings_cmd(message: Message):
     if message.chat.type == ChatType.PRIVATE:
         return
-    if not await is_admin(message.chat.id, message.from_user.id):
+    if not await is_command_admin(message):
         await message.reply("⛔ Faqat admin uchun.")
         return
     s = get_settings(message.chat.id)
@@ -697,7 +715,7 @@ async def settings_cmd(message: Message):
 async def toggle_setting(message: Message, key: str, value: int, label: str):
     if message.chat.type == ChatType.PRIVATE:
         return
-    if not await is_admin(message.chat.id, message.from_user.id):
+    if not await is_command_admin(message):
         await message.reply("⛔ Faqat admin uchun.")
         return
     set_setting(message.chat.id, key, value)
@@ -744,7 +762,7 @@ async def alert_off(message: Message): await toggle_setting(message, "admin_aler
 
 @dp.message(Command("post"))
 async def post_cmd(message: Message):
-    if not await is_admin(message.chat.id, message.from_user.id):
+    if not await is_command_admin(message):
         await message.reply("⛔ Faqat admin uchun.")
         return
     if not CHANNEL_USERNAME:
@@ -838,7 +856,7 @@ async def moderation(message: Message):
     ensure_settings(message.chat.id)
     s = get_settings(message.chat.id)
 
-    if await is_admin(message.chat.id, message.from_user.id):
+    if await is_command_admin(message):
         return
 
     text = message.text or message.caption or ""
